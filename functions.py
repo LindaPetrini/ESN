@@ -2,8 +2,6 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 
-input_size = 1
-output_size = 1
 
 
 
@@ -30,7 +28,7 @@ def init_W(hidden_size, sp_rad, sparse=0.2):
 
     return W
 
-def init_weights(hidden_size, sp_rad):
+def init_weights(hidden_size, sp_rad, input_size, output_size):
     W_in = np.random.normal(0, 1, (hidden_size, input_size))
     W_bw = np.random.normal(0, 1, (hidden_size, output_size))
     W = init_W(hidden_size, sp_rad)
@@ -62,6 +60,33 @@ def ridge(X, Yt, lamb, hidden_size, input_size):
 
 def mse(out, targ):
     return 0.5 * (np.sum((out - targ) ** 2))
+
+def read_file(filename, output_size):
+
+    f = open(filename, 'r')
+    lines = f.readlines()
+    N_max = len(lines)-2
+    N = int(N_max * 0.8)
+    input_size = len(lines[0].split(",")) - 2
+
+    input_train = np.zeros((N, input_size))
+    target_train = np.zeros((N, output_size))
+
+    input_test = np.zeros((N_max - N, input_size))
+    target_test = np.zeros((N_max - N, output_size))
+
+    for ind, line in enumerate(lines[1:N_max]):
+        if ind < N:
+            target_train[ind] = line.split(",")[:output_size]
+            input_train[ind] = line.split(",")[output_size:]
+        else:
+            target_test[N-ind] = line.split(",")[:output_size]
+            input_test[N-ind] = line.split(",")[output_size:]
+
+    input_train = input_train / np.amax(np.fabs(input_train))
+    input_test /= np.amax(np.fabs(input_test))
+
+    return input_train, target_train, input_test, target_test, N, N_max, input_size
 
 
 
