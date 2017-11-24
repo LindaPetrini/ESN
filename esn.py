@@ -1,163 +1,103 @@
 import numpy as np
-import math
-import matplotlib.pyplot as plt
+import pickle
 
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
 
+class ESN:
 
-#f = open('./train_data/aalborg.csv', 'r')
-#f = open('./train_data/alpine-1.csv', 'r')
-#f = open('./train_data/f-speedway.csv', 'r')
-#lines = f.readlines()
+    def __init__(self, input_size, output_size, hidden_size=30, lamb=0.1, a=0.3, sp_rad=0.03, washout=100):
+        self.input_size = input_size
+        self.output_size = output_size
+        self.hidden_size = hidden_size
 
-def gen_cosine(n, num):
-    x = np.linspace(0, num * math.pi, n)
-    #t = np.random.normal(np.cos(x), 0.2)
-    t = np.cos(x)
+        self.washout = washout
+        self.lamb = lamb
+        self.a = a
+        self.sp_rad = sp_rad
 
-    return x, t
+        self.hidden = np.zeros((self.hidden_size, 1))
+        self.output = np.zeros((self.output_size, 1))
 
-def init_stuff(hidden_size, sp_rad):
-    W_in = np.random.normal(0, 1, (hidden_size, input_size))
-    # W_out = np.random.normal(0, 1, (output_size, hidden_size + input_size + 1))
-    W_bw = np.random.normal(0, 1, (hidden_size, output_size))
-    b_in = np.random.normal(0, 1, (N_max, 1))
-    b_out = np.random.normal(0, 1, (N_max, 1))
+        self.W_in = (np.random.rand(self.hidden_size, 1 + self.input_size) - 0.5) * 1
+        self.W = self.init_W()
+        self.W_out = np.zeros((self.hidden_size, self.output_size))
+        self.train()
 
-    # init W
-    a = np.random.binomial(1, 0.1, (hidden_size, hidden_size))
-    b = np.random.normal(0, 1, (hidden_size, hidden_size))
-    W = a * b
-    sp_rad_risc = np.amax(np.absolute(np.linalg.eig(W)[0]))
-    W *= 1 / sp_rad_risc
-    W *= sp_rad
+    def activate(self, inp, sigm=False, tanh=False):
+        self.forward_pass(inp)
+        self.output = np.dot(self.W_out, np.vstack((1, inp, self.hidden)))
+        if sigm:
+            self.output[:2] = sigmoid(self.output[:2])
+        if tanh:
+            self.output[:2] = np.tanh(self.output[:2])
+        return self.output
 
-    return W_in, W_bw, W
+    def store_net(self, filename="net.pickle"):
+        pickle.dump(self, open(filename, 'wb'))
 
-def forward_pass(hidden_size, washout):
-    X = np.zeros((hidden_size + input_size, N - washout))
-    Yt = target_train[washout:].T
+    def reset(self):
+        self.hidden = np.zeros((self.hidden_size, 1))
+        self.output = np.zeros((self.output_size, 1))
 
-    # init hidden
-    hidden = np.zeros((hidden_size))
+    def init_W(self):
+        W = np.random.rand(self.hidden_size, self.hidden_size) - 0.5
+        sp_rad_risc = max(abs(np.linalg.eig(W)[0]))
+        W *= (1 / sp_rad_risc)
+        W *= self.sp_rad
+        return W
 
-    for t in range(N):
-        inp_t = input_train[t].T
+    def train(self, ind=0):
+        filenames = ["./train_data/aalborg.csv", "./train_data/alpine-1.csv", "./train_data/f-speedway.csv"]
+        input_train, target_train, N, self.input_size = self.read_file(filenames[ind], 3)
 
-        forz = target_train[t].T
-        # tmp = W_in @ inp_t + W @ hidden + W_bw @ forz
+        X = np.zeros((1 + self.hidden_size + self.input_size, N - 1 - self.washout))
+        Yt = target_train[:, self.washout + 1:]
 
-        tmp = (W_in * inp_t).squeeze() + (W @ hidden.T) + (W_bw * forz).squeeze()
+        for t in range(N - 1):
+            inp = input_train[:, t].reshape(-1, 1)
+            self.forward_pass(inp)
+            if t >= self.washout:
+                X[:, t - self.washout] = np.vstack((1, inp, self.hidden)).squeeze()
 
-        hidden = sigmoid(tmp)
+        self.W_out = self.ridge(X, Yt)
 
-        if t >= washout:
-            X[:, t - washout] = np.concatenate((hidden.flatten(), inp_t.flatten()))
+    def ridge(self, X, Yt):
+        X_t = X.T
+        W_out = np.dot(np.dot(Yt, X_t), np.linalg.inv(np.dot(X, X_t) + self.lamb * np.eye(1 + self.input_size + self.hidden_size)))
+        return W_out
 
-    X_t = X.T
+    def forward_pass(self, inp):
+        self.hidden = (1 - self.a) * self.hidden + self.a * np.tanh(np.dot(self.W_in, np.vstack((inp, 1))) + np.dot(self.W, self.hidden))
 
-    return X, Yt
+    def read_file(self, filename, output_size):
+        f = open(filename, 'r')
+        lines = f.readlines()
+        N_max = len(lines) - 2
+        input_size = len(lines[0].split(",")) - 2
 
+        input_train = np.zeros((input_size, N_max))
+        target_train = np.zeros((output_size + 1, N_max))
 
+        for ind, line in enumerate(lines[1:N_max]):
 
+            target_train[:2, ind] = line.split(",")[:2]
 
+            steer = float(line.split(",")[2])
+            if steer >= 0:
+                target_train[2, ind] = steer
+                target_train[3, ind] = 0
+            else:
+                target_train[2, ind] = 0
+                target_train[3, ind] = (-1) * steer
 
+            input_train[:, ind] = line.split(",")[output_size:]
 
-np.random.seed(42)
-Nd = 1000
-num = 6
-input_train, target_train = gen_cosine(Nd, num)
-N_max = Nd
-N = Nd
+        # normalize
+        input_train[0] = input_train[0] / np.amax(np.fabs(input_train[0]))
+        input_train[3:] = input_train[3:] / np.amax(np.fabs(input_train[3:]))
 
+        return input_train, target_train, N_max, input_size
 
-
-#input_size = len(lines[0].split(",")) - 2
-#output_size = 3
-#N_max = len(lines)-2
-#N = int(N_max * 0.8)
-
-input_size = 1
-output_size = 1
-# hidden_size = 30  # size of reservoir
-# washout = 10
-# sp_rad = 0.5
-lamb = 0.1
-
-hidden_sizes = [50, 100, 300, 500]
-washouts = [10, 100, 500]
-sp_rads = [0.2, 0.5, 0.7]
-
-for hidden_size in hidden_sizes:
-    for washout in washouts:
-        for sp_rad in sp_rads:
-
-
-
-# input_train = np.zeros((N, input_size))
-# target_train = np.zeros((N, output_size))
-#
-# input_test = np.zeros((N_max - N, input_size))
-# target_test = np.zeros((N_max - N, output_size))
-#
-# print("reading data:")
-# for ind, line in enumerate(lines[500:N_max]):
-#     if ind < N:
-#         target_train[ind] = line.split(",")[:3]
-#         input_train[ind] = line.split(",")[3:]
-#     else:
-#         target_test[N-ind] = line.split(",")[:3]
-#         input_test[N-ind] = line.split(",")[3:]
-#     print("*", end="")
-#
-# input_train = input_train / np.amax(np.fabs(input_train))
-# input_test /= np.amax(np.fabs(input_test))
-
-
-#matrix init
-
-            W_in, W_bw, W = init_stuff(hidden_size, sp_rad)
-
-
-
-            #test
-            # out = target_train[-1]
-            # for t in range(N_max-N):
-            #     inp_t = input_test[t].T
-            #     tmp = W_in @ inp_t + W @ hidden + W_bw @ out
-            #     hidden = sigmoid(tmp)
-            #     out = W_out @ np.concatenate((hidden, inp_t))
-            #     #out[:2] = sigmoid(out[:2])
-            #     #out[2] = np.tanh(out[2])
-            #
-            #     mse = 0.5 * (np.sum((out - target_test[t]) ** 2))
-            #     if target_test[t][0] == 0:
-            #         print("iter: ", t, "mse:", mse)
-            #         print("out", out)
-            #         print("target", target_test[t], "\n")
-
-            #test
-            out = target_train[0]
-            ls = []
-            for t in range(N):
-                inp_t = input_train[t].T
-
-                #tmp = W_in @ inp_t + W @ hidden + W_bw @ out
-                tmp = (W_in * inp_t).squeeze() + (W @ hidden) + (W_bw * out).squeeze()
-
-                hidden = sigmoid(tmp)
-                out = W_out @ np.concatenate((hidden.flatten(), inp_t.flatten()))
-                #out[:2] = sigmoid(out[:2])
-                #out[2] = np.tanh(out[2])
-
-                mse = 0.5 * (np.sum((out - target_train[t]) ** 2))
-                #if target_train[t][0] == 0:
-                print("iter: ", t, "mse:", mse)
-                print("out", out)
-                print("target", target_train[t], "\n")
-                ls.append(out)
-
-            x = np.linspace(0, num * math.pi, Nd)
-            plt.figure(ind)
-            plt.plot(x, target_train)
-            plt.plot(x, ls)
-            plt.show()
+    def mse(self, out, targ):
+        return 0.5 * (np.sum((out - targ) ** 2))
