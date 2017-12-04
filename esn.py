@@ -12,8 +12,8 @@ def logit(x):
 
 
 class ESN:
-    def __init__(self, input_size, output_size, hidden_size=30, lamb=1, a=0.7, sp_rad=0.8,
-                 washout=100, delta=0.1, online_training=True, bias=True):
+    def __init__(self, input_size, output_size, hidden_size=30, lamb=1, a=0.2, sp_rad=0.2,
+                 washout=0, delta=0.9, online_training=True, bias=True):
         self.input_size = input_size
         self.output_size = output_size
         self.hidden_size = hidden_size
@@ -72,6 +72,8 @@ class ESN:
                                                                         + np.dot(self.W, self.hidden))
 
     def activate(self, inp):
+
+
         self.forward_pass(inp)
 
         if self.bias:
@@ -108,21 +110,7 @@ class ESN:
 
     def online_train(self, inp, target):
         self.output = self.activate(inp).reshape(-1, 1)
-
         targ = np.copy(target)
-
-        # for ind in range(len(targ)):
-        #     if abs(targ[ind]) == 1:
-        #         targ[ind] -= targ[ind] * 5e-15
-        #
-        #     if targ[ind] == -1:
-        #         print("AHHH")
-        #
-        #     if abs(targ[ind]) == 0:
-        #         targ[ind] += 5e-15
-        #
-        # targ[2] = np.arctanh(targ[2])
-        # targ[:2] = logit(targ[:2])
 
         self.epsilon = (targ - self.output)
         if self.bias:
@@ -162,9 +150,36 @@ class ESN:
     def mse(self, out, targ):
         return 0.5 * (np.sum((out - targ) ** 2))
 
-    def save_genome(self, file, parameters):
-        np.savetxt(file, parameters.reshape(-1), header=str(self.input_size) + ', ' + str(self.output_size)
-                                                        + ', ' + str(self.hidden_size))
+    def save_genome(self, file):
+
+        if self.bias:
+            parameters = np.zeros((self.hidden_size + self.output_size, 1 + self.hidden_size
+                                   + self.input_size + self.output_size))
+
+            parameters[:self.output_size, : self.input_size + 1] = self.W_out[:, : self.input_size + 1]
+            parameters[:self.output_size, self.input_size + 1 + self.output_size:] = self.W_out[:, self.input_size + 1:]
+            parameters[self.output_size:, :self.input_size + 1] = self.W_in
+            parameters[self.output_size:, self.input_size + 1 + self.output_size:] = self.W
+
+            print(parameters)
+            np.savetxt(file, parameters, header=str(self.input_size) + ',' + str(self.output_size)
+                                                + ',' + str(self.hidden_size) + ',' + str(1))
+
+        else:
+            parameters = np.zeros((self.hidden_size + self.output_size, self.hidden_size
+                                   + self.input_size + self.output_size))
+
+            parameters[:self.output_size, : self.input_size] = self.W_out[:, : self.input_size]
+            parameters[:self.output_size, self.input_size + self.output_size:] = self.W_out[:, self.input_size:]
+            parameters[self.output_size:, :self.input_size] = self.W_in
+            parameters[self.output_size:, self.input_size + self.output_size:] = self.W
+
+            print(parameters)
+            np.savetxt(file, parameters, header=str(self.input_size) + ',' + str(self.output_size)
+                                                + ',' + str(self.hidden_size) + "," + str(0))
+
+
+
 
 
 def read_file(filename, ster_out=1, reduce=True, sizes=False):
@@ -189,7 +204,10 @@ def read_file(filename, ster_out=1, reduce=True, sizes=False):
     inputs = lines[0].split(",")
 
     inputs_to_find = ["angle_0", "speedX_0", "speedY_0", "track_0", "track_18", "trackPos_0"]
-    targets_to_find = ["accel_0", "brake_0", "steer_0"]
+    #targets_to_find = ["accel_0", "brake_0", "steer_0"]
+
+    targets_to_find = ["speedX_0", "trackPos_0"]
+
     indexes_inp = {}
     indexes_out = {}
 
@@ -200,9 +218,9 @@ def read_file(filename, ster_out=1, reduce=True, sizes=False):
         indexes_out[string] = find_ind(string, inputs)
 
     if ster_out == 1:
-        output_size = 3
+        output_size = len(indexes_out)
     else:
-        output_size = 4
+        output_size = len(indexes_out) + 1
 
     input_size = find_input_len(lines[1].split(","), indexes_inp, reduce)
 
@@ -215,8 +233,6 @@ def read_file(filename, ster_out=1, reduce=True, sizes=False):
         input_train[ind] = np.array(inp_to_array(lis, indexes_inp, reduce))
         target_train[ind] = np.array(target_to_array(lis, indexes_out, ster_out))
 
-    # for i in range(len(target_train)):
-    #    target_train[i] /= np.amax(np.fabs(target_train[i]))
 
     if sizes:
         return input_train, target_train, N_max, input_size, output_size
@@ -280,18 +296,22 @@ def target_to_array(lis, indexes, ster_out):
     :return:
     '''
     target = list()
-    target.append(lis[indexes["accel_0"]])
-    target.append(lis[indexes["brake_0"]])
+    target.append(float(lis[indexes["speedX_0"]]))
 
-    if ster_out == 1:
-        target.append(lis[indexes["steer_0"]])
-    else:
-        steer = float(lis[indexes["steer_0"]])
-        if steer >= 0:
-            target.append(steer)
-            target.append(0.0)
-        else:
-            target.append(0.0)
-            target.append((-1.0) * steer)
+    # target.append(lis[indexes["accel_0"]])
+    # target.append(lis[indexes["brake_0"]])
+    #
+    # if ster_out == 1:
+    #     target.append(lis[indexes["steer_0"]])
+    # else:
+    #     steer = float(lis[indexes["steer_0"]])
+    #     if steer >= 0:
+    #         target.append(steer)
+    #         target.append(0.0)
+    #     else:
+    #         target.append(0.0)
+    #         target.append((-1.0) * steer)
+    target.append(lis[indexes["trackPos_0"]])
+
 
     return target
