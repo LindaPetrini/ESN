@@ -85,7 +85,7 @@ class ESN:
             concats = np.append(inp, self.hidden).reshape(-1, 1)
             self.output = np.dot(self.W_out, concats)
 
-        # self.output[2:] = sigmoid(self.output[2:])
+        self.output[1] = np.tanh(self.output[1])
         #
         # if self.output_size == 1:
         #     self.output[2] = np.tanh(self.output[2])

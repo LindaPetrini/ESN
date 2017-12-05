@@ -15,13 +15,13 @@ steer_out = 1
 
 file_ind = find_ind("forza_1", filenames)
 for index in range(0, len(filenames), 3):
-#for index in range(0, 1):
-    #index = file_ind
+
     esn = ESN(input_size, output_size, hidden_size)
     for file_index in range(index, index + 3):
+
         input_train, target_train, N_max = read_file(os.path.join(data_dir, filenames[file_index]), steer_out)
 
-        epochs = 1
+        epochs = 3
 
         #train
         for epoch in range(epochs):
@@ -38,7 +38,7 @@ for index in range(0, len(filenames), 3):
                     print("mse", mse)
                     print("\n")
 
-            esn.reset()
+        esn.reset()
 
     print("hid", esn.W)
     print("in", esn.W_in)
@@ -50,7 +50,6 @@ for index in range(0, len(filenames), 3):
     esn.save_genome("%s.params" % out_name)
 
 
-input("heey")
 #for i in range(len(filenames)):
 input_test, target_test, N_max_t = read_file(os.path.join(data_dir, filenames[1]), steer_out)
 
