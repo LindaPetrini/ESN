@@ -65,7 +65,7 @@ class ESN:
         if self.bias:
 
             self.hidden = (1 - self.a) * self.hidden + self.a * np.tanh(np.dot(self.W_in, concats)
-                                                                            + np.dot(self.W, self.hidden))
+                                                                        + np.dot(self.W, self.hidden))
 
         else:
             self.hidden = (1 - self.a) * self.hidden + self.a * np.tanh(np.dot(self.W_in, inp)
@@ -162,9 +162,30 @@ class ESN:
     def mse(self, out, targ):
         return 0.5 * (np.sum((out - targ) ** 2))
 
-    def save_genome(self, file, parameters):
-        np.savetxt(file, parameters.reshape(-1), header=str(self.input_size) + ', ' + str(self.output_size)
-                                                        + ', ' + str(self.hidden_size))
+    def save_genome(self, file):
+        if self.bias:
+            parameters = np.zeros((self.hidden_size + self.output_size, 1 + self.hidden_size
+                                   + + self.input_size + self.output_size))
+
+            parameters[:self.output_size, : self.input_size + 1] = self.W_out[:, : self.input_size + 1]
+            parameters[:self.output_size, self.input_size + 1 + self.output_size:] = self.W_out[:, self.input_size + 1:]
+            parameters[self.output_size:, :self.input_size + 1] = self.W_in
+            parameters[self.output_size:, self.input_size + 1 + self.output_size:] = self.W
+
+            print(parameters)
+            np.savetxt(file, parameters, header=str(self.input_size) + ',' + str(self.output_size) + ',' + str(self.hidden_size) + ',' + str(1))
+
+        else:
+             parameters = np.zeros((self.hidden_size + self.output_size, self.hidden_size
+                                   + + self.input_size + self.output_size))
+
+             parameters[:self.output_size, : self.input_size] = self.W_out[:, : self.input_size]
+             parameters[:self.output_size, self.input_size + self.output_size:] = self.W_out[:, self.input_size:]
+             parameters[self.output_size:, :self.input_size] = self.W_in
+             parameters[self.output_size:, self.input_size + self.output_size:] = self.W
+
+             print(parameters)
+             np.savetxt(file, parameters, header=str(self.input_size) + ',' + str(self.output_size) + ',' + str(self.hidden_size) + "," + str(0))
 
 
 def read_file(filename, ster_out=1, reduce=True, sizes=False):
@@ -222,6 +243,7 @@ def read_file(filename, ster_out=1, reduce=True, sizes=False):
         return input_train, target_train, N_max, input_size, output_size
     else:
         return input_train, target_train, N_max
+
 
 def find_ind(string, lis):
     index = None
