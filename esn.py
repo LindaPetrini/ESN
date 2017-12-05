@@ -156,12 +156,13 @@ class ESN:
             parameters = np.zeros((self.hidden_size + self.output_size, 1 + self.hidden_size
                                    + self.input_size + self.output_size))
 
-            parameters[:self.output_size, : self.input_size + 1] = self.W_out[:, : self.input_size + 1]
-            parameters[:self.output_size, self.input_size + 1 + self.output_size:] = self.W_out[:, self.input_size + 1:]
-            parameters[self.output_size:, :self.input_size + 1] = self.W_in
-            parameters[self.output_size:, self.input_size + 1 + self.output_size:] = self.W
+            parameters[:self.output_size, : self.input_size] = self.W_out[:, 1: self.input_size + 1]
+            parameters[:self.output_size, self.input_size + self.output_size: -1] = self.W_out[:, self.input_size + 1:]
+            parameters[:self.output_size, -1] = self.W_out[:, 0]
+            parameters[self.output_size:, :self.input_size] = self.W_in[:, 1:]
+            parameters[self.output_size:, self.input_size + self.output_size:-1] = self.W
+            parameters[self.output_size:, -1] = self.W_in[:, 0]
 
-            print(parameters)
             np.savetxt(file, parameters, header=str(self.input_size) + ',' + str(self.output_size)
                                                 + ',' + str(self.hidden_size) + ',' + str(1))
 
@@ -174,7 +175,6 @@ class ESN:
             parameters[self.output_size:, :self.input_size] = self.W_in
             parameters[self.output_size:, self.input_size + self.output_size:] = self.W
 
-            print(parameters)
             np.savetxt(file, parameters, header=str(self.input_size) + ',' + str(self.output_size)
                                                 + ',' + str(self.hidden_size) + "," + str(0))
 
@@ -288,13 +288,6 @@ def inp_to_array(lis, indexes, reduce=True):
 
 
 def target_to_array(lis, indexes, ster_out):
-    '''
-    ["accel_0", "brake_0", "steer_0"]
-    :param list:
-    :param indexes:
-    :param ster_out:
-    :return:
-    '''
     target = list()
     target.append(float(lis[indexes["speedX_0"]]))
 
