@@ -1,8 +1,8 @@
 .idea/
 __pycache__/
 *.pickle
-.nets/
-.nets2/
-.output/
-.train_data/
-.data/
+nets/
+nets2/
+output/
+train_data/
+data/
