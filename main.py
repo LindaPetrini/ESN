@@ -8,20 +8,20 @@ data_dir = "./output/"
 output_dir = "./nets/"
 filenames = os.listdir(data_dir)
 filenames.sort()
-hidden_size = 3
+hidden_size = 10
 input_size = 11
 output_size = 2
 steer_out = 1
 
-file_ind = find_ind("forza_1", filenames)
-for index in range(0, len(filenames), 3):
+#file_ind = find_ind("forza_1", filenames)
+for index in range(0, len(filenames) - 3, 6):
 
-    esn = ESN(input_size, output_size, hidden_size)
-    for file_index in range(index, index + 3):
+    esn = ESN(input_size, output_size, hidden_size, bias=False)
+    for file_index in range(index, index + 6):
 
         input_train, target_train, N_max = read_file(os.path.join(data_dir, filenames[file_index]), steer_out)
 
-        epochs = 3
+        epochs = 2
 
         #train
         for epoch in range(epochs):
@@ -47,7 +47,7 @@ for index in range(0, len(filenames), 3):
 
     #esn.store_net("forza.pickle")
     out_name = os.path.join(output_dir, filenames[index])
-    esn.save_genome("%s.params" % out_name)
+    esn.save_genome("%s_2.params" % out_name)
 
 
 #for i in range(len(filenames)):
