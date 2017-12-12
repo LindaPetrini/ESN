@@ -3,6 +3,5 @@ __pycache__/
 *.pickle
 nets/
 nets2/
-output/
 train_data/
 data/
